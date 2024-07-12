@@ -26,3 +26,13 @@ Broadcast::channel('chat', function ($user) {
     }
     return false;
 });
+
+Broadcast::channel('chat.private.{userSend}.{userReceive}', function ($user, $userSend, $userReceive) {
+    if ($user != null) {
+        if ($user->id == $userSend || $user->id == $userReceive) {
+           return true;
+        }
+    }
+    return false;
+}
+);

@@ -141,15 +141,13 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-2 user-list">
-                @foreach($users as $user)
                     <a href="{{route('chatPrivate',$user->id)}}" id="link_{{$user->id}}">
                         <img src="{{$user->image}}" alt="" class="img-fluid">
                         <p>{{$user->name}}</p>
                     </a>
-                @endforeach
             </div>
             <div class="col-10">
-                <ul class="block-chat">
+                <ul class="block-chat" id="messages">
                     @foreach($messages as $message)
                         <li class="{{ $message->user_id === Auth::id() ? 'my-message' : 'other-message' }}">
                             <span>{{ $message->user->name }}:</span> @php
@@ -162,7 +160,6 @@
                             <div class="message-time">{{ $message->created_at->format('H:i:s') }}</div>
                         </li>
                     @endforeach
-
                 </ul>
                 <form action="" class="chat-input">
                     <input type="text" class="form-control" id="inputChat" placeholder="Nhập tin nhắn">
@@ -199,56 +196,16 @@
                     el.appendChild(elementStatus);
                 }
             })
+            // Xử lý khi có người dùng rời đi
             .leaving((user) => {
                 console.log(user, 'rời đi');
                 let el = document.getElementById('link_' + user.id);
-
-                // Gửi request khi người dùng rời đi
-                axios.put(`/leaving/${user.id}`)
-                    .then((res) => {
-                        console.log(res.data.status);
-                    }).catch((error) => {
-                    console.error('Lỗi khi gửi request:', error);
-                });
-
                 let elementStatus = el.querySelector('.status');
                 if (elementStatus) {
                     el.removeChild(elementStatus);
                 }
             })
 
-            // Lắng nghe sự kiện 'UserOnline' và hiển thị tin nhắn
-            .listen('UserOnline', (event) => {
-                let blockChat = document.querySelector('.block-chat');
-                let elementChat = document.createElement('li');
-                let messageContent = `${event.msg}`;
-                let messageTime = new Date(event.created_at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-
-                // Kiểm tra nếu messageContent chứa đường dẫn bắt đầu bằng 'https'
-                if (messageContent.startsWith('https://')) {
-                    elementChat.innerHTML = `
-                            ${event.user.name}:
-                            <img src="${messageContent}" alt="Image" class="img-fluid" style="width: 200px">
-                            <div class="message-time">${messageTime}</div>
-                               `;
-                } else {
-                    elementChat.innerHTML = `
-                            ${event.user.name}:
-                            <span>${messageContent}</span>
-                            <div class="message-time">${messageTime}</div>
-                                `;
-                }
-                if (event.user.id === {{ Auth::user()->id }}) {
-                    elementChat.classList.add('my-message');
-                } else {
-                    elementChat.classList.add('other-message');
-                }
-                blockChat.appendChild(elementChat);
-                blockChat.scrollTop = blockChat.scrollHeight;
-            })
             // Xử lý khi có lỗi xảy ra
             .error((error) => {
                 console.error('Lỗi:', error);
@@ -256,12 +213,94 @@
 
         // Xử lý khi nhấn nút 'Gửi'
         document.getElementById('btnSend').addEventListener('click', () => {
-            axios.post('{{ route('send') }}', {
+            axios.post('{{ route('sendPrivate',$user->id) }}', {
                 msg: document.getElementById('inputChat').value,
+                conversation_id : {{$conversation->id}}
             }).then((res) => {
                 console.log(res.data.status);
                 document.getElementById('inputChat').value = '';
             });
         });
     </script>
+
+{{--    <script type="module">--}}
+{{--        Echo.private('chat.private.{{Auth::user()->id}}.{{$user->id}}')--}}
+{{--            .listen('ChatPrivate',e=>{--}}
+{{--                let messages = document.querySelector('#messages');--}}
+{{--                let elementChat = document.createElement('li');--}}
+{{--                elementChat.textContent = `${e.userSend.name}: ${e.msg} | ${e.created_at}`;--}}
+{{--                elementChat.classList.add('my-message');--}}
+{{--                messages.appendChild(elementChat);--}}
+{{--            })--}}
+
+{{--        Echo.private('chat.private.{{$user->id}}.{{Auth::user()->id}}')--}}
+{{--            .listen('ChatPrivate', e=>{--}}
+{{--                let messages = document.querySelector('#messages');--}}
+{{--                let elementChat = document.createElement('li');--}}
+{{--                elementChat.textContent = `${e.userSend.name}: ${e.msg} | ${e.created_at}`;--}}
+{{--                elementChat.classList.add('other-message');--}}
+{{--                messages.appendChild(elementChat);--}}
+{{--            })--}}
+{{--    </script>--}}
+
+
+    <script type="module">
+        Echo.private('chat.private.{{ Auth::user()->id }}.{{ $user->id }}')
+            .listen('ChatPrivate', event => {
+                let messages = document.querySelector('#messages');
+                let elementChat = document.createElement('li');
+                let messageContent = `${event.msg}`;
+                let messageTime = new Date(event.created_at).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                if (messageContent.startsWith('https://')) {
+                    elementChat.innerHTML = `
+                    <strong>${event.userSend.name}:</strong>
+                    <img src="${messageContent}" alt="Image" class="img-fluid" style="width: 200px">
+                    <div class="message-time">${messageTime}</div>
+                `;
+                } else {
+                    elementChat.innerHTML = `
+                    <strong>${event.userSend.name}:</strong>
+                    <span>${messageContent}</span>
+                    <div class="message-time">${messageTime}</div>
+                `;
+                }
+                elementChat.classList.add('my-message');
+                messages.appendChild(elementChat);
+                messages.scrollTop = messages.scrollHeight;
+            });
+
+        Echo.private('chat.private.{{ $user->id }}.{{ Auth::user()->id }}')
+            .listen('ChatPrivate', event => {
+                let messages = document.querySelector('#messages');
+                let elementChat = document.createElement('li');
+                let messageContent = `${event.msg}`;
+                let messageTime = new Date(event.created_at).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                if (messageContent.startsWith('https://')) {
+                    elementChat.innerHTML = `
+                    <strong>${event.userSend.name}:</strong>
+                    <img src="${messageContent}" alt="Image" class="img-fluid" style="width: 200px">
+                    <div class="message-time">${messageTime}</div>
+                `;
+                } else {
+                    elementChat.innerHTML = `
+                    <strong>${event.userSend.name}:</strong>
+                    <span>${messageContent}</span>
+                    <div class="message-time">${messageTime}</div>
+                `;
+                }
+                elementChat.classList.add('other-message');
+                messages.appendChild(elementChat);
+                messages.scrollTop = messages.scrollHeight;
+
+            });
+    </script>
+
 @endsection
